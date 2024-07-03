@@ -1,0 +1,50 @@
+name: Create and publish a Docker image
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Check out external repository
+        uses: actions/checkout@v4
+        with:
+          repository: nkanaev/yarr
+          path: external-repo
+          fetch-depth: 1
+
+      - name: Get external repository SHA
+        run: |
+          cd external-repo
+          echo "EXTERNAL_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EXTERNAL_SHA }}
